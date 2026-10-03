@@ -24,7 +24,24 @@ import {
   UsePowerEffect,
 } from '@ptcg/common';
 
+// Transform asks the store whether its Power is blocked, and the store propagates that
+// question through every card in play - Ditto included - so the question would ask itself
+// forever. A nested lookup reports "not transformed" instead, which every caller handles.
+let resolvingTransform = false;
+
 function getTransformedPokemonCard(self: Ditto, store: StoreLike, state: State, target: PokemonSlot): PokemonCard | undefined {
+  if (resolvingTransform) {
+    return undefined;
+  }
+  resolvingTransform = true;
+  try {
+    return findTransformedPokemonCard(self, store, state, target);
+  } finally {
+    resolvingTransform = false;
+  }
+}
+
+function findTransformedPokemonCard(self: Ditto, store: StoreLike, state: State, target: PokemonSlot): PokemonCard | undefined {
   const power: Power = { powerType: PowerType.POKEPOWER, name: 'Transform', text: '' };
   const player = StateUtils.findOwner(state, target);
   const opponent = StateUtils.getOpponent(state, player);
@@ -169,8 +186,7 @@ export class Ditto extends PokemonCard {
         state,
         new ChooseAttackPrompt(player.id, GameMessage.CHOOSE_ATTACK_TO_COPY, [pokemonCard], {
           allowCancel: true,
-          // TODO
-          // enableAbility: { useWhenInPlay: true }
+          enableAbility: { useWhenInPlay: true }
         }),
         result => {
           if (result === null) {
@@ -190,9 +206,58 @@ export class Ditto extends PokemonCard {
       );
     }
 
-    // TODO
-    // Copy passive Abilities
+    // Copy passive Pokemon Powers.
+    //
+    // Every card in the game sees every effect, so the card Ditto is copying is already
+    // being asked about this one - it just does not recognise Ditto's slot as its own.
+    // Standing it in Ditto's slot for the length of the call makes its own
+    // `cards.includes(this)` / `getPokemonCard() === this` guards resolve the way the
+    // card text says they should ("treat it as if it were the same card").
+    return this.delegateToCopiedCard(store, state, effect);
+  }
 
+  private delegating: boolean = false;
+
+  private delegateToCopiedCard(store: StoreLike, state: State, effect: Effect): State {
+    if (this.delegating) {
+      return state;
+    }
+    this.delegating = true;
+    try {
+      for (const player of state.players) {
+        const slot = player.active;
+        const index = slot.pokemons.cards.indexOf(this);
+        if (index === -1) {
+          continue;
+        }
+
+        // Only effects aimed at Ditto's own slot. An effect a card recognises some other
+        // way - an attack it owns, a Power it owns - already reaches the copied card
+        // where it really stands, and forwarding it here would apply it a second time.
+        // Ditto always copies the Defending Pokemon, so that card is always in play.
+        const aimedHere = (effect as { target?: unknown }).target === slot
+          || (effect as { source?: unknown }).source === slot;
+        if (!aimedHere) {
+          continue;
+        }
+
+        const copied = getTransformedPokemonCard(this, store, state, slot);
+        if (copied === undefined) {
+          continue;
+        }
+
+        // Swap rather than insert: the slot keeps exactly one top card, so nothing else
+        // walking the board sees a Pokemon that is not there.
+        slot.pokemons.cards[index] = copied;
+        try {
+          state = copied.reduceEffect(store, state, effect);
+        } finally {
+          slot.pokemons.cards[index] = this;
+        }
+      }
+    } finally {
+      this.delegating = false;
+    }
     return state;
   }
 }
