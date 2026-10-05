@@ -39,9 +39,11 @@ function putStartingPokemonsAndPrizes(player: Player, cards: Card[]): void {
 
 function* setupGame(next: Function, store: StoreLike, state: State): IterableIterator<State> {
   const basicPokemon: FilterType = [
-    {superType: SuperType.POKEMON, stage: Stage.BASIC},
-    {superType: SuperType.TRAINER, tags: [CardTag.FOSSIL]}
+    {superType: SuperType.POKEMON, stage: Stage.BASIC}
   ];
+  if (state.rules.fossilsAsStarters) {
+    basicPokemon.push({superType: SuperType.TRAINER, tags: [CardTag.FOSSIL]});
+  }
   const chooseCardsOptions = { min: 1, max: 6, allowCancel: false };
   const player = state.players[0];
   const opponent = state.players[1];
