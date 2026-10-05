@@ -40,6 +40,7 @@ export class Store implements StoreLike {
   private promptItems: PromptItem[] = [];
   private waitItems: (() => void)[] = [];
   private logId: number = 0;
+  private cardRanks: Map<Card, number> | undefined;
 
   constructor(private handler: StoreHandler) { }
 
@@ -193,7 +194,13 @@ export class Store implements StoreLike {
   }
 
   private reduce(state: State, action: Action): State {
-    const stateBackup = deepClone(state, [ Card ]);
+    // The log only grows, and existing entries are never modified, so the backup keeps
+    // the current entries by reference instead of deep-cloning the whole history.
+    const logs = state.logs;
+    state.logs = [];
+    const stateBackup: State = deepClone(state, [ Card ]);
+    state.logs = logs;
+    stateBackup.logs = logs.slice();
     this.promptItems.length = 0;
 
     try {
@@ -236,8 +243,49 @@ export class Store implements StoreLike {
       player.deck.cards.forEach(c => cards.push(c));
       player.discard.cards.forEach(c => cards.push(c));
     }
-    cards.sort((c1, c2) => (c2.superType - c1.superType) || c1.fullName.localeCompare(c2.fullName));
-    cards.forEach(c => { state = c.reduceEffect(this, state, effect); });
+    for (const c of this.sortCards(cards)) {
+      state = c.reduceEffect(this, state, effect);
+    }
     return state;
+  }
+
+  // Same order as a stable sort by superType (descending), then fullName:
+  // cards are bucketed by a precomputed rank, keeping their collection order
+  // within a bucket. The ranks are rebuilt whenever a card not seen before
+  // shows up, so cards entering the game mid-way are handled.
+  private sortCards(cards: Card[]): Card[] {
+    let ranks = this.cardRanks;
+    if (ranks === undefined || cards.some(c => !ranks!.has(c))) {
+      ranks = this.buildCardRanks(cards);
+    }
+    const buckets: Card[][] = [];
+    for (const c of cards) {
+      const rank = ranks.get(c)!;
+      (buckets[rank] || (buckets[rank] = [])).push(c);
+    }
+    const sorted: Card[] = [];
+    for (const bucket of buckets) {
+      if (bucket !== undefined) {
+        bucket.forEach(c => sorted.push(c));
+      }
+    }
+    return sorted;
+  }
+
+  private buildCardRanks(cards: Card[]): Map<Card, number> {
+    const known = this.cardRanks === undefined ? [] : Array.from(this.cardRanks.keys());
+    const all = Array.from(new Set([ ...known, ...cards ]));
+    const compare = (c1: Card, c2: Card) => (c2.superType - c1.superType) || c1.fullName.localeCompare(c2.fullName);
+    all.sort(compare);
+    const ranks = new Map<Card, number>();
+    let rank = 0;
+    all.forEach((c, i) => {
+      if (i > 0 && compare(all[i - 1], c) !== 0) {
+        rank++;
+      }
+      ranks.set(c, rank);
+    });
+    this.cardRanks = ranks;
+    return ranks;
   }
 }
