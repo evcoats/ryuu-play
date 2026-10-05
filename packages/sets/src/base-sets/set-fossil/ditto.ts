@@ -2,9 +2,11 @@ import {
   AfterCheckProvidedEnergyEffect,
   Attack,
   CardType,
+  CheckAttackCostEffect,
   CheckHpEffect,
   CheckPokemonStatsEffect,
   CheckPokemonTypeEffect,
+  CheckProvidedEnergyEffect,
   CheckRetreatCostEffect,
   ChooseAttackPrompt,
   Effect,
@@ -182,11 +184,30 @@ export class Ditto extends PokemonCard {
         throw new GameError(GameMessage.CANNOT_USE_POWER);
       }
 
+      // Attacks Ditto can't pay for are blocked, so the prompt only offers what it can use.
+      // Its Energy already counts as every type (see AfterCheckProvidedEnergyEffect above).
+      const checkProvidedEnergy = new CheckProvidedEnergyEffect(player);
+      store.reduceEffect(state, checkProvidedEnergy);
+      const blocked = pokemonCard.attacks
+        .filter(attack => {
+          const checkAttackCost = new CheckAttackCostEffect(player, attack);
+          store.reduceEffect(state, checkAttackCost);
+          return !StateUtils.checkEnoughEnergy(checkProvidedEnergy.energyMap, checkAttackCost.cost);
+        })
+        .map(attack => ({ index: 0, name: attack.name }));
+      // Against another Ditto, copying its Transform would only copy this Power again.
+      for (const power of pokemonCard.powers) {
+        if (power.name === this.powers[0].name) {
+          blocked.push({ index: 0, name: power.name });
+        }
+      }
+
       return store.prompt(
         state,
         new ChooseAttackPrompt(player.id, GameMessage.CHOOSE_ATTACK_TO_COPY, [pokemonCard], {
           allowCancel: true,
-          enableAbility: { useWhenInPlay: true }
+          enableAbility: { useWhenInPlay: true },
+          blocked
         }),
         result => {
           if (result === null) {

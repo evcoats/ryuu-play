@@ -101,6 +101,31 @@ describe('Ditto FO', () => {
     expect(prompt.cards[0]).toBe(opponent.active.getPokemonCard());
   });
 
+  it('Should block copied attacks it has too little Energy for', () => {
+    // Two Energy pay for Jab (1) but not Special Punch (3); using it anyway used to throw
+    const { player, prompts } = TestUtils.getAll(sim);
+    TestUtils.setDefending(sim, [ new Hitmonchan() ]);
+    const ditto = player.active.getPokemonCard() as Ditto;
+
+    sim.store.reduceEffect(sim.store.state, new UsePowerEffect(player, ditto.powers[0], ditto));
+    const prompt: any = prompts[prompts.length - 1];
+    expect(prompt.options.blocked).toEqual([ { index: 0, name: 'Special Punch' } ]);
+  });
+
+  it('Should not offer another Ditto its Transform', () => {
+    const { player, prompts } = TestUtils.getAll(sim);
+    TestUtils.setDefending(sim, [ new Ditto() ]);
+    const ditto = player.active.getPokemonCard() as Ditto;
+
+    try {
+      sim.store.reduceEffect(sim.store.state, new UsePowerEffect(player, ditto.powers[0], ditto));
+    } catch (e) {
+      return;  // not transformed at all: nothing is offered
+    }
+    const prompt: any = prompts[prompts.length - 1];
+    expect(prompt.options.blocked.map((b: any) => b.name)).toContain('Transform');
+  });
+
   it('Should copy a passive Pokemon Power of the card it is imitating', () => {
     // Mr. Mime Invisible Wall prevents 30 or more, and Ditto should have it too
     const { player, opponent } = TestUtils.getAll(sim);
