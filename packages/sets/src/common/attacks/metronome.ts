@@ -31,10 +31,21 @@ export const metronome: CommonAttack = function(
         return state;
       }
 
+      // Metronome can't copy Metronome: against another Clefairy / Clefable the copy would
+      // prompt again with the same choice, without end. Whatever a chain of copies ends on can
+      // be copied directly, so nothing else is lost.
+      const blocked = pokemonCard.attacks
+        .filter(a => a.name === 'Metronome')
+        .map(a => ({ index: 0, name: a.name }));
+      if (blocked.length === pokemonCard.attacks.length) {
+        return state;
+      }
+
       return store.prompt(
         state,
         new ChooseAttackPrompt(player.id, GameMessage.CHOOSE_ATTACK_TO_COPY, [pokemonCard], {
           allowCancel: true,
+          blocked,
         }),
         result => {
           if (result !== null) {
