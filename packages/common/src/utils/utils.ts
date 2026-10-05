@@ -81,7 +81,9 @@ function cloneValue(source: any, ignores: Function[], refMap: Map<Object, Object
     if (ref !== undefined) {
       return ref;
     }
-    const dest = Object.create(source);
+    // A copy on the same prototype as the source, not one whose prototype is the source:
+    // that made every cloned object a prototype, which V8 keeps in a slower representation.
+    const dest = Object.create(Object.getPrototypeOf(source));
     refMap.set(source, dest);
     const keys = Object.keys(source);
     for (let i = 0; i < keys.length; i++) {
