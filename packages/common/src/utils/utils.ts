@@ -52,27 +52,40 @@ export function deepIterate(source: any, callback: (holder: any, key: string, va
   }
 }
 
-export function deepClone(source: any, ignores: Function[] = [], refMap: {s: Object, d: Object}[] = []): any {
+export function deepClone(source: any, ignores: Function[] = []): any {
+  return cloneValue(source, ignores, new Map());
+}
+
+// An object reached twice is cloned once (refMap); arrays are always copied. The map lookup
+// replaces a linear search over every object cloned so far, which made a clone O(n^2).
+// Object.keys gives the same keys in the same order as for-in filtered by hasOwnProperty.
+function cloneValue(source: any, ignores: Function[], refMap: Map<Object, Object>): any {
   if (source === null) { return null; }
 
-  if (source instanceof Array) {
-    return source.map((item: any) => deepClone(item, ignores, refMap));
+  if (Array.isArray(source)) {
+    const n = source.length;
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+      out[i] = cloneValue(source[i], ignores, refMap);
+    }
+    return out;
   }
 
   if (source instanceof Object) {
-    if (ignores.some(ignore => source instanceof ignore)) {
-      return source;
+    for (let i = 0; i < ignores.length; i++) {
+      if (source instanceof ignores[i]) {
+        return source;
+      }
     }
-    const ref = refMap.find(item => item.s === source);
+    const ref = refMap.get(source);
     if (ref !== undefined) {
-      return ref.d;
+      return ref;
     }
     const dest = Object.create(source);
-    refMap.push({s: source, d: dest});
-    for (const key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        dest[key] = deepClone(source[key], ignores, refMap);
-      }
+    refMap.set(source, dest);
+    const keys = Object.keys(source);
+    for (let i = 0; i < keys.length; i++) {
+      dest[keys[i]] = cloneValue(source[keys[i]], ignores, refMap);
     }
     return dest;
   }

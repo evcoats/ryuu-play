@@ -224,24 +224,33 @@ export class Store implements StoreLike {
   }
 
   private propagateEffect(state: State, effect: Effect): State {
+    // Cards that keep Card's no-op reduceEffect (most basic Energy, vanilla Pokemon) are
+    // left out: asking them changes nothing, and they are a third of the cards in a game.
     const cards: Card[] = [];
+    const collect = (list: Card[]) => {
+      for (const c of list) {
+        if (c.reduceEffect !== Card.prototype.reduceEffect) {
+          cards.push(c);
+        }
+      }
+    };
     for (const player of state.players) {
-      player.stadium.cards.forEach(c => cards.push(c));
-      player.supporter.cards.forEach(c => cards.push(c));
-      player.active.trainers.cards.forEach(c => cards.push(c));
-      player.active.energies.cards.forEach(c => cards.push(c));
-      player.active.pokemons.cards.forEach(c => cards.push(c));
+      collect(player.stadium.cards);
+      collect(player.supporter.cards);
+      collect(player.active.trainers.cards);
+      collect(player.active.energies.cards);
+      collect(player.active.pokemons.cards);
       for (const bench of player.bench) {
-        bench.trainers.cards.forEach(c => cards.push(c));
-        bench.energies.cards.forEach(c => cards.push(c));
-        bench.pokemons.cards.forEach(c => cards.push(c));
+        collect(bench.trainers.cards);
+        collect(bench.energies.cards);
+        collect(bench.pokemons.cards);
       }
       for (const prize of player.prizes) {
-        prize.cards.forEach(c => cards.push(c));
+        collect(prize.cards);
       }
-      player.hand.cards.forEach(c => cards.push(c));
-      player.deck.cards.forEach(c => cards.push(c));
-      player.discard.cards.forEach(c => cards.push(c));
+      collect(player.hand.cards);
+      collect(player.deck.cards);
+      collect(player.discard.cards);
     }
     for (const c of this.sortCards(cards)) {
       state = c.reduceEffect(this, state, effect);
@@ -250,24 +259,37 @@ export class Store implements StoreLike {
   }
 
   // Same order as a stable sort by superType (descending), then fullName:
-  // cards are bucketed by a precomputed rank, keeping their collection order
-  // within a bucket. The ranks are rebuilt whenever a card not seen before
+  // a counting sort on a precomputed rank, which keeps the collection order
+  // within a rank. The ranks are rebuilt whenever a card not seen before
   // shows up, so cards entering the game mid-way are handled.
   private sortCards(cards: Card[]): Card[] {
+    const n = cards.length;
+    const keys = new Int32Array(n);
     let ranks = this.cardRanks;
-    if (ranks === undefined || cards.some(c => !ranks!.has(c))) {
-      ranks = this.buildCardRanks(cards);
-    }
-    const buckets: Card[][] = [];
-    for (const c of cards) {
-      const rank = ranks.get(c)!;
-      (buckets[rank] || (buckets[rank] = [])).push(c);
-    }
-    const sorted: Card[] = [];
-    for (const bucket of buckets) {
-      if (bucket !== undefined) {
-        bucket.forEach(c => sorted.push(c));
+    let maxRank = -1;
+    for (let i = 0; i < n; i++) {
+      const rank = ranks === undefined ? undefined : ranks.get(cards[i]);
+      if (rank === undefined) {
+        ranks = this.buildCardRanks(cards);
+        maxRank = -1;
+        i = -1;
+        continue;
       }
+      keys[i] = rank;
+      if (rank > maxRank) {
+        maxRank = rank;
+      }
+    }
+    const counts = new Int32Array(maxRank + 2);
+    for (let i = 0; i < n; i++) {
+      counts[keys[i] + 1]++;
+    }
+    for (let r = 1; r < counts.length; r++) {
+      counts[r] += counts[r - 1];
+    }
+    const sorted: Card[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      sorted[counts[keys[i]]++] = cards[i];
     }
     return sorted;
   }
