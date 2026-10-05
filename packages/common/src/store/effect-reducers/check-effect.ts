@@ -27,6 +27,12 @@ function findKoPokemons(store: StoreLike, state: State): PokemonItem[] {
   for (let i = 0; i < state.players.length; i++) {
     const player = state.players[i];
     player.forEachPokemon(PlayerType.BOTTOM_PLAYER, (pokemonSlot, card, target) => {
+      // An undamaged Pokemon is only knocked out if an effect brings its HP to 0, and no
+      // card lowers HP (they only raise it), so its HP check is skipped. It is one effect
+      // propagation through every card per Pokemon in play, after every action.
+      if (pokemonSlot.damage <= 0) {
+        return;
+      }
       const checkHpEffect = new CheckHpEffect(player, pokemonSlot);
       store.reduceEffect(state, checkHpEffect);
 
