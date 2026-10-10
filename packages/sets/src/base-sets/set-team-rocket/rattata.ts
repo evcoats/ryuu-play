@@ -80,6 +80,11 @@ export class Rattata extends PokemonCard {
         throw new GameError(GameMessage.POWER_ALREADY_USED);
       }
 
+      // With no deck there is no top card to switch with (the swap used to put `undefined` in the Prizes).
+      if (player.deck.cards.length === 0 || player.prizes.every(p => p.cards.length === 0)) {
+        throw new GameError(GameMessage.CANNOT_USE_POWER);
+      }
+
       powerUseOnce.setMarker(effect);
       return store.prompt(
         state,

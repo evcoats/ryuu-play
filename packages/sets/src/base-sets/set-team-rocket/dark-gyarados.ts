@@ -6,7 +6,6 @@ import {
   CoinFlipPrompt,
   DealDamageEffect,
   Effect,
-  GameError,
   GameMessage,
   GamePhase,
   KnockOutEffect,
@@ -83,7 +82,7 @@ export class DarkGyarados extends PokemonCard {
         || active.specialConditions.includes(SpecialCondition.ASLEEP)
         || active.specialConditions.includes(SpecialCondition.CONFUSED)
         || active.specialConditions.includes(SpecialCondition.PARALYZED)) {
-        throw new GameError(GameMessage.CANNOT_USE_POWER);
+        return state;     // the Power just doesn't happen (throwing here aborted the opponent's attack)
       }
 
       // Try to reduce PowerEffect, to check if something is blocking our ability
