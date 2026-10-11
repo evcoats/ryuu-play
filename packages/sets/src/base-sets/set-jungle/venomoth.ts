@@ -78,8 +78,11 @@ function* useShift(next: Function, store: StoreLike, state: State, self: Venomot
       const value = promptOptions[choice].value;
       const message = promptOptions[choice].message;
       store.log(state, GameLog.LOG_PLAYER_CHANGES_TYPE_TO, { name: player.name, message });
-      changeType.removeMarkersByName(self.TYPE_CHANGE_MARKER, player.active);
-      player.active.marker.addMarker(self.TYPE_CHANGE_MARKER + value, self);
+      // Venomoth's own type changes (it was the Active Pokemon's), once during the turn (the marker was
+      // checked but never set, so Shift could be used any number of times)
+      changeType.removeMarkersByName(self.TYPE_CHANGE_MARKER, pokemonSlot);
+      pokemonSlot.marker.addMarker(self.TYPE_CHANGE_MARKER + value, self);
+      player.marker.addMarker(self.SHIFT_MARKER, self);
     }
   );
 }
