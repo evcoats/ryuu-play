@@ -119,6 +119,9 @@ export class DarkDragonair extends PokemonCard {
         throw new GameError(GameMessage.POWER_ALREADY_USED);
       }
 
+      // Once during your turn: the marker was checked but never set, so the Power could be used (and the
+      // deck shuffled) any number of times in a turn
+      powerUseOnce.setMarker(effect);
       const generator = useEvolutionaryLight(() => generator.next(), store, state, effect);
       return generator.next().value;
     }
