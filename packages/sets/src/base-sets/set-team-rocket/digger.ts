@@ -13,18 +13,21 @@ import {
 function* playCard(next: Function, store: StoreLike, state: State, effect: TrainerEffect): IterableIterator<State> {
   const player = effect.player;
   const opponent = StateUtils.getOpponent(state, player);
-  let currentPlayer = player;
-  let flipResult = true;
+  // The players flip in turn, starting with the player; whoever flips tails damages their own Active Pokemon.
+  let flipper = player;
+  let heads = true;
 
-  while (flipResult) {
+  while (heads) {
     yield store.prompt(state, new CoinFlipPrompt(player.id, GameMessage.COIN_FLIP), result => {
-      flipResult = result;
+      heads = result;
       next();
     });
-    currentPlayer = currentPlayer === player ? opponent : player;
+    if (heads) {
+      flipper = flipper === player ? opponent : player;
+    }
   }
 
-  currentPlayer.active.damage += 10;
+  flipper.active.damage += 10;
   return state;
 }
 

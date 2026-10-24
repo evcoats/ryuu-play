@@ -44,6 +44,7 @@ function* playCard(next: Function, store: StoreLike, state: State, effect: Train
 
   if (!wantToUse) {
     player.deck.moveTo(player.hand, 2);
+    return state;
   }
 
   // Player
@@ -85,8 +86,8 @@ function* playCard(next: Function, store: StoreLike, state: State, effect: Train
     ),
     selected => {
       const cards = selected || [];
-      if (cards.length > slots.length) {
-        cards.length = slots.length;
+      if (cards.length > slotsOpponent.length) {
+        cards.length = slotsOpponent.length;
       }
       cards.forEach((card, index) => {
         opponent.deck.moveCardTo(card, slotsOpponent[index].pokemons);

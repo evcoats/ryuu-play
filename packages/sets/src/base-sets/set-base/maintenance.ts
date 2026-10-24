@@ -28,10 +28,6 @@ function* playCard(
     throw new GameError(GameMessage.CANNOT_PLAY_THIS_CARD);
   }
 
-  if (player.deck.cards.length === 0) {
-    throw new GameError(GameMessage.CANNOT_PLAY_THIS_CARD);
-  }
-
   // We will discard this card after prompt confirmation
   effect.preventDefault = true;
 
@@ -60,12 +56,15 @@ function* playCard(
   }
 
   player.hand.moveCardTo(self, player.discard);
-  player.deck.moveTo(player.hand, 1);
   player.hand.moveCardsTo(cards, player.deck);
 
-  return store.prompt(state, new ShuffleDeckPrompt(player.id), order => {
+  yield store.prompt(state, new ShuffleDeckPrompt(player.id), order => {
     player.deck.applyOrder(order);
+    next();
   });
+
+  player.deck.moveTo(player.hand, 1);
+  return state;
 }
 
 export class Maintenance extends TrainerCard {

@@ -65,6 +65,8 @@ function* playCard(
     return state;
   }
 
+  player.hand.moveCardsTo(cards, player.discard);
+
   const blocked: number[] = [];
   player.discard.cards.forEach((c, index) => {
     if (!(c instanceof TrainerCard)) {
@@ -85,7 +87,7 @@ function* playCard(
       GameMessage.CHOOSE_CARD_TO_HAND,
       player.discard,
       {},
-      { min: 1, max: 1, allowCancel: true, blocked }
+      { min: 1, max: 1, allowCancel: false, blocked }
     ),
     selected => {
       recovered = selected || [];
@@ -93,14 +95,8 @@ function* playCard(
     }
   );
 
-  // Operation canceled by the user
-  if (recovered.length === 0) {
-    return state;
-  }
-
-  player.hand.moveCardTo(self, player.discard);
-  player.hand.moveCardsTo(cards, player.discard);
   player.discard.moveCardsTo(recovered, player.hand);
+  player.hand.moveCardTo(self, player.discard);
   return state;
 }
 

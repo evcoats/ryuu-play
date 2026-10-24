@@ -42,7 +42,8 @@ export class Pluspower extends TrainerCard {
       const player = effect.player;
       const opponent = StateUtils.getOpponent(state, player);
 
-      if (effect.target === opponent.active && effect.damage > 0) {
+      // Defender runs first (cards resolve by name), so test the damage before it: max(0, d + 10 - 20)
+      if (effect.target === opponent.active && effect.baseDamage > 0) {
         effect.damage += 10; // After weakness and resistance
       }
       return state;

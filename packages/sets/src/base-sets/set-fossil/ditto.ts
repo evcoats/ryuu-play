@@ -12,6 +12,7 @@ import {
   Effect,
   GameError,
   GameMessage,
+  KnockOutEffect,
   PokemonCard,
   PokemonSlot,
   Power,
@@ -22,6 +23,7 @@ import {
   State,
   StateUtils,
   StoreLike,
+  TrainerCard,
   UseAttackEffect,
   UsePowerEffect,
 } from '@ptcg/common';
@@ -234,6 +236,16 @@ export class Ditto extends PokemonCard {
     // Standing it in Ditto's slot for the length of the call makes its own
     // `cards.includes(this)` / `getPokemonCard() === this` guards resolve the way the
     // card text says they should ("treat it as if it were the same card").
+    // A copy of Clefairy Doll or Mysterious Fossil (a Trainer in play) is not a Knocked Out Pokemon: Ditto goes to the
+    // discard pile and gives no Prize (6-29-00 ruling). Delegating would run that card's own handler on Ditto's slot.
+    if (effect instanceof KnockOutEffect && effect.target.pokemons.cards.includes(this)) {
+      const copied = getTransformedPokemonCard(this, store, state, effect.target);
+      if (copied instanceof TrainerCard) {
+        effect.prizeCount = 0;
+        return state;
+      }
+    }
+
     return this.delegateToCopiedCard(store, state, effect);
   }
 

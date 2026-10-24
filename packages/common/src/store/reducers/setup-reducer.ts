@@ -80,7 +80,7 @@ function* setupGame(next: Function, store: StoreLike, state: State): IterableIte
         new AlertPrompt(opponent.id, GameMessage.SETUP_PLAYER_NO_BASIC)
       ], results => {
         if (results[0]) {
-          player.deck.moveTo(player.hand, 1);
+          player.deck.moveTo(player.hand, state.rules.mulliganDrawCards);
         }
         next();
       });
@@ -94,7 +94,7 @@ function* setupGame(next: Function, store: StoreLike, state: State): IterableIte
         new AlertPrompt(player.id, GameMessage.SETUP_PLAYER_NO_BASIC)
       ], results => {
         if (results[0]) {
-          opponent.deck.moveTo(opponent.hand, 1);
+          opponent.deck.moveTo(opponent.hand, state.rules.mulliganDrawCards);
         }
         next();
       });

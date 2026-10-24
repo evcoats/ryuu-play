@@ -65,10 +65,13 @@ export class PutDamageEffect extends AbstractAttackEffect implements Effect {
   readonly type: string = AttackEffects.PUT_DAMAGE_EFFECT;
   public preventDefault = false;
   public damage: number;
+  // The damage the effect was created with (after Weakness and Resistance), before any card changes it.
+  public readonly baseDamage: number;
 
   constructor(base: AttackEffect, damage: number) {
     super(base);
     this.damage = damage;
+    this.baseDamage = damage;
   }
 }
 

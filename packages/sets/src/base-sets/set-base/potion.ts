@@ -19,7 +19,7 @@ export class Potion extends TrainerCard {
 
   public text: string = 'Remove up to 2 damage counters from 1 of your Pokémon.';
 
-  public potion(store: StoreLike, state: State, effect: Effect): State {
+  public reduceEffect(store: StoreLike, state: State, effect: Effect): State {
     const potion = commonTrainers.potion(this, store, state, effect);
 
     if (effect instanceof TrainerEffect && effect.trainerCard === this) {
