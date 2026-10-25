@@ -15,6 +15,7 @@ import { PlayerType, SlotType } from '../actions/play-card-action';
 import { KnockOutEffect } from '../effects/game-effects';
 import { Effect } from '../effects/effect';
 import { PokemonSlot } from '../state/pokemon-slot';
+import { Player } from '../state/player';
 
 interface PokemonItem {
   playerNum: number;
@@ -108,13 +109,29 @@ function handleBenchSizeChange(store: StoreLike, state: State, benchSize: number
   return state;
 }
 
+function hasBenched(player: Player): boolean {
+  return player.bench.some(bench => bench.pokemons.cards.length > 0);
+}
+
+// Whether the game ends once each player has taken prizesToTake Prizes. A player wins by
+// taking their last Prize, and loses with no Active Pokemon and no Benched Pokemon to replace
+// it; when both win, the one who can replace their Active wins (Rulings Compendium, WIN
+// STATES). Only whether a Benched Pokemon exists counts, never which one is promoted, so the
+// end is known before anyone chooses a new Active.
+function gameEnds(state: State, prizesToTake: [number, number]): boolean {
+  return state.players.some((player, i) => {
+    const prizesLeft = player.prizes.filter(p => p.cards.length > 0).length - prizesToTake[i];
+    const lost = player.active.pokemons.cards.length === 0 && !hasBenched(player);
+    return prizesLeft <= 0 || lost;
+  });
+}
+
 function chooseActivePokemons(state: State): ChoosePokemonPrompt[] {
   const prompts: ChoosePokemonPrompt[] = [];
 
   for (const player of state.players) {
     const hasActive = player.active.pokemons.cards.length > 0;
-    const hasBenched = player.bench.some(bench => bench.pokemons.cards.length > 0);
-    if (!hasActive && hasBenched) {
+    if (!hasActive && hasBenched(player)) {
       const choose = new ChoosePokemonPrompt(
         player.id,
         GameMessage.CHOOSE_NEW_ACTIVE_POKEMON,
@@ -194,8 +211,9 @@ function checkWinner(
   const points: [number, number] = [0, 0];
   for (let i = 0; i < state.players.length; i++) {
     const player = state.players[i];
-    // Player has no active Pokemon, opponent wins.
-    if (player.active.pokemons.cards.length === 0) {
+    // Player has no active Pokemon and none to promote, opponent wins. (A player who could
+    // promote one is not asked to when the game ends anyway, see gameEnds.)
+    if (player.active.pokemons.cards.length === 0 && !hasBenched(player)) {
       store.log(state, GameLog.LOG_PLAYER_NO_ACTIVE_POKEMON, { name: player.name });
       points[i === 0 ? 1 : 0]++;
     }
@@ -303,9 +321,10 @@ function* executeCheckState(next: Function, store: StoreLike, state: State,
     }
   }
 
+  // When the game ends after these Prizes, choosing a new Active would change nothing.
   const prompts: (ChoosePrizePrompt | ChoosePokemonPrompt)[] = [
     ...choosePrizeCards(state, prizesToTake),
-    ...chooseActivePokemons(state)
+    ...(gameEnds(state, prizesToTake) ? [] : chooseActivePokemons(state))
   ];
 
   const completed: [boolean, boolean] = [false, false];

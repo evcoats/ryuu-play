@@ -1,4 +1,5 @@
 import { ChooseEnergyPrompt } from '../prompts/choose-energy-prompt';
+import { CoinFlipPrompt } from '../prompts/coin-flip-prompt';
 import { GameError } from '../../game-error';
 import { GameMessage, GameLog } from '../../game-message';
 import { Effect } from '../effects/effect';
@@ -28,6 +29,24 @@ function retreatPokemon(store: StoreLike, state: State, effect: RetreatEffect) {
   player.switchPokemon(player.bench[effect.benchIndex]);
 }
 
+// Rules.baseEraConfusion: a Confused Pokemon retreats only on heads, flipped after the Retreat Cost
+// is paid. On tails it stays Active and can't try to retreat again this turn.
+function retreatOrFlip(store: StoreLike, state: State, effect: RetreatEffect, confused: boolean): State {
+  if (!confused) {
+    retreatPokemon(store, state, effect);
+    return state;
+  }
+  const player = effect.player;
+  store.log(state, GameLog.LOG_FLIP_CONFUSION, { name: player.name });
+  return store.prompt(state, new CoinFlipPrompt(player.id, GameMessage.FLIP_CONFUSION), heads => {
+    if (heads) {
+      retreatPokemon(store, state, effect);
+    } else {
+      player.retreatedTurn = state.turn;
+    }
+  });
+}
+
 export function retreatReducer(store: StoreLike, state: State, effect: Effect): State {
 
   /* Retreat pokemon */
@@ -47,12 +66,13 @@ export function retreatReducer(store: StoreLike, state: State, effect: Effect): 
       throw new GameError(GameMessage.RETREAT_ALREADY_USED);
     }
 
+    const confused = state.rules.baseEraConfusion && sp.includes(SpecialCondition.CONFUSED);
+
     const checkRetreatCost = new CheckRetreatCostEffect(effect.player);
     state = store.reduceEffect(state, checkRetreatCost);
 
     if (checkRetreatCost.cost.length === 0) {
-      retreatPokemon(store, state, effect);
-      return state;
+      return retreatOrFlip(store, state, effect, confused);
     }
 
     const checkProvidedEnergy = new CheckProvidedEnergyEffect(player);
@@ -80,7 +100,7 @@ export function retreatReducer(store: StoreLike, state: State, effect: Effect): 
 
       const cards = energy.map(e => e.card) as EnergyCard[];
       player.active.energies.moveCardsTo(cards, player.discard);
-      retreatPokemon(store, state, effect);
+      retreatOrFlip(store, state, effect, confused);
     });
   }
 

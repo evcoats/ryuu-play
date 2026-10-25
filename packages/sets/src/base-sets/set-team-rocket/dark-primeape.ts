@@ -54,10 +54,9 @@ export class DarkPrimeape extends PokemonCard {
 
   public reduceEffect(store: StoreLike, state: State, effect: Effect): State {
 
-    // Note: Having problem with this one. When flip for confusion fails,
-    // we put damage counters, it's not "doing the damage" (for example
-    // Defender is not reducing the damage, weakness is not applied, etc).
-    // I think we shouldn't place 6 damage counters when confusion fails.
+    // A failed Confusion flip does damage through DealDamageEffect only under Rules.baseEraConfusion,
+    // where Frenzy makes it 20 + 30 = 50 to itself (April 27, 2000 WotC Chat, Q14 & Q37). Under the
+    // later rules the 30 is placed directly, and Frenzy doesn't add to it.
     if (effect instanceof DealDamageEffect && effect.source.getPokemonCard() === this) {
       const player = StateUtils.findOwner(state, effect.source);
 

@@ -95,10 +95,20 @@ export class DarkDugtrio extends PokemonCard {
       // Q. Is Dark Dugtrio's Sinkhole Pokémon Power cumulative in any way?
       // A. They are cumulative. You would flip for each Dugtrio's effect (May 4, 2000 WotC Chat, Q20)
 
-      return store.prompt(state, new CoinFlipPrompt(player.id, GameMessage.COIN_FLIP), result => {
-        if (result === false) {
-          player.active.damage += 20;
+      // The flip waits until the retreat is over, and happens only if the Pokemon did retreat: Sinkhole
+      // "is assuming a SUCCESSFUL Retreating", so a Confused Pokemon that fails its flip takes nothing
+      // (April 27, 2000 WotC Chat). The damage goes to the Pokemon that retreated (a free retreat used
+      // to switch before the flip, and the 20 hit the new Active).
+      const retreating = player.active;
+      return store.waitPrompt(state, () => {
+        if (player.active === retreating || !player.bench.includes(retreating)) {
+          return;
         }
+        store.prompt(state, new CoinFlipPrompt(player.id, GameMessage.COIN_FLIP), result => {
+          if (result === false) {
+            retreating.damage += 20;
+          }
+        });
       });
     }
 

@@ -7,7 +7,7 @@ import { StoreLike } from '../store-like';
 import { StateUtils } from '../state-utils';
 import { CheckPokemonTypeEffect, CheckPokemonStatsEffect,
   CheckProvidedEnergyEffect, CheckAttackCostEffect } from '../effects/check-effects';
-import { Weakness, Resistance } from '../card/pokemon-types';
+import { Attack, Weakness, Resistance } from '../card/pokemon-types';
 import { CardType, SpecialCondition, CardTag } from '../card/card-types';
 import { AttackEffect, UseAttackEffect, HealEffect, KnockOutEffect,
   UsePowerEffect, PowerEffect, UseStadiumEffect, EvolveEffect } from '../effects/game-effects';
@@ -41,6 +41,10 @@ function applyWeaknessAndResistance(
 
   return (damage * multiply) + modifier;
 }
+
+// The attack a Confused Pokemon makes on itself under Rules.baseEraConfusion. Its own object, so
+// card code keyed on the attack it tried to use (Drain heals and the like) doesn't run on it.
+const CONFUSION_SELF_HIT: Attack = { name: 'Confusion', cost: [], damage: '20', text: '' };
 
 function* useAttack(next: Function, store: StoreLike, state: State, effect: UseAttackEffect): IterableIterator<State> {
   const player = effect.player;
@@ -76,7 +80,17 @@ function* useAttack(next: Function, store: StoreLike, state: State, effect: UseA
 
     if (flip === false) {
       store.log(state, GameLog.LOG_HURTS_ITSELF);
-      player.active.damage += 30;
+      if (state.rules.baseEraConfusion) {
+        // It attacks itself for 20: Weakness and Resistance by its own type, then damage effects
+        const selfHit = new DealDamageEffect(new AttackEffect(player, opponent, CONFUSION_SELF_HIT), 20);
+        selfHit.target = player.active;
+        state = store.reduceEffect(state, selfHit);
+        if (store.hasPrompts()) {
+          yield store.waitPrompt(state, () => next());
+        }
+      } else {
+        player.active.damage += 30;
+      }
       state = store.reduceEffect(state, new EndTurnEffect(player));
       return state;
     }
