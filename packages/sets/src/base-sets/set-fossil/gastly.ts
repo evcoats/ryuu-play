@@ -65,7 +65,10 @@ export class Gastly extends PokemonCard {
       const player = effect.player;
       const energyCount = player.discard.cards.filter(c => c.superType === SuperType.ENERGY).length;
 
-      if (energyCount === 0) {
+      if (energyCount === 0) {   // nothing to fetch, but Gastly still does 10 damage to itself
+        const dealDamage = new DealDamageEffect(effect, 10);
+        dealDamage.target = player.active;
+        store.reduceEffect(state, dealDamage);
         return state;
       }
 
